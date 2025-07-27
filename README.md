@@ -1,4 +1,4 @@
-# JWLSync
+# JWLibrarySync
 
 A Python utility for merging JW Library backup archives (*.jwlibrary files).
 
@@ -29,7 +29,7 @@ python -c "import tkinter; print('tkinter is available')"
 5. Create and activate a virtual environment:
 ```powershell
 # Navigate to the project directory
-cd JWLSync
+cd JWLibrarySync
 
 # Create virtual environment
 python -m venv venv
@@ -58,7 +58,7 @@ Run the program (make sure virtual environment is activated):
 .\venv\Scripts\activate
 
 # Run the program
-python jwlsync.py
+python JWLibrarySync.py
 ```
 
 The program will:
