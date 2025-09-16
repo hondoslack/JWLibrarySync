@@ -11,17 +11,18 @@ import datetime
 import logging
 from datetime import UTC
 from pathlib import Path
-from tkinter import Tk, filedialog
+# from tkinter import Tk, filedialog  # Only needed for CLI version
 from tqdm import tqdm
 
 class JWLibrarySyncError(Exception):
     pass
 
 class JWLibrarySync:
-    def __init__(self):
+    def __init__(self, progress_callback=None):
         self.temp_dir = None
         self.source_dir = None
         self.dest_dir = None
+        self.progress_callback = progress_callback
         self.id_mappings = {
             'LocationId': {},
             'UserMarkId': {},
@@ -38,60 +39,121 @@ class JWLibrarySync:
     def setup_logging(self):
         """Configure logging to write to both file and console"""
         self.logger = logging.getLogger('JWLibrarySync')
-        self.logger.setLevel(logging.DEBUG)
         
-        # Create logs directory if it doesn't exist
-        log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
-        os.makedirs(log_dir, exist_ok=True)
+        # Get logging configuration from environment
+        environment = os.getenv('ENVIRONMENT', 'development').lower()
+        log_level_str = os.getenv('LOG_LEVEL', '').upper()
         
-        # File handler with timestamp in filename
-        log_file = os.path.join(log_dir, f'jwlsync_{datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}.log')
-        file_handler = logging.FileHandler(log_file)
-        file_handler.setLevel(logging.DEBUG)
+        # Set default log levels based on environment
+        if environment == 'production':
+            default_file_level = logging.INFO
+            default_console_level = logging.WARNING
+        else:
+            default_file_level = logging.DEBUG
+            default_console_level = logging.INFO
+            
+        # Override with explicit LOG_LEVEL if provided
+        if log_level_str:
+            try:
+                explicit_level = getattr(logging, log_level_str)
+                default_file_level = explicit_level
+                # In production, keep console quiet unless explicitly set to DEBUG
+                if environment != 'production' or log_level_str == 'DEBUG':
+                    default_console_level = explicit_level
+            except AttributeError:
+                # Invalid log level, use defaults
+                pass
+        
+        # Set logger level to the lowest level we'll use
+        self.logger.setLevel(min(default_file_level, default_console_level))
+        
+        # Clear any existing handlers (important for web apps)
+        self.logger.handlers.clear()
+        
+        # Create logs directory if it doesn't exist (only if we're doing file logging)
+        if environment != 'production' or log_level_str == 'DEBUG':
+            log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
+            os.makedirs(log_dir, exist_ok=True)
+            
+            # File handler with timestamp in filename
+            log_file = os.path.join(log_dir, f'jwlsync_{datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}.log')
+            file_handler = logging.FileHandler(log_file)
+            file_handler.setLevel(default_file_level)
+            
+            # Create formatter for file
+            file_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+            file_handler.setFormatter(file_formatter)
+            self.logger.addHandler(file_handler)
         
         # Console handler
         console_handler = logging.StreamHandler()
-        console_handler.setLevel(logging.INFO)
+        console_handler.setLevel(default_console_level)
         
-        # Create formatters and add them to the handlers
-        file_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        # Create formatter for console
         console_formatter = logging.Formatter('%(message)s')
-        file_handler.setFormatter(file_formatter)
         console_handler.setFormatter(console_formatter)
-        
-        # Add the handlers to the logger
-        self.logger.addHandler(file_handler)
         self.logger.addHandler(console_handler)
         
-        self.logger.info("JWLibrarySync started")
-        self.logger.debug(f"Log file: {log_file}")
+        # Log startup info
+        self.logger.info(f"JWLibrarySync started (Environment: {environment}, Log Level: File={logging.getLevelName(default_file_level)}, Console={logging.getLevelName(default_console_level)})")
+        if environment != 'production' or log_level_str == 'DEBUG':
+            self.logger.debug(f"Log file: {log_file if 'log_file' in locals() else 'None (production mode)'}")
 
     def cleanup(self):
-        """Clean up temporary directories"""
+        """Clean up temporary directories immediately after processing"""
         if self.temp_dir and os.path.exists(self.temp_dir):
             try:
+                self.logger.debug(f"Cleaning up temporary directory: {self.temp_dir}")
+                
+                # Calculate size before cleanup for logging
+                total_size = 0
+                file_count = 0
+                try:
+                    for root, dirs, files in os.walk(self.temp_dir):
+                        for file in files:
+                            filepath = os.path.join(root, file)
+                            try:
+                                total_size += os.path.getsize(filepath)
+                                file_count += 1
+                            except:
+                                pass
+                except:
+                    pass
+                
                 # Give Windows a moment to release file handles
-                time.sleep(0.5)
+                time.sleep(0.1)
                 
                 # Force close any SQLite connections in the temp directory
-                source_db_path = os.path.join(self.source_dir, 'userData.db')
-                dest_db_path = os.path.join(self.dest_dir, 'userData.db')
-                
-                if os.path.exists(source_db_path):
-                    try:
-                        conn = sqlite3.connect(source_db_path)
-                        conn.close()
-                    except:
-                        pass
+                if self.source_dir:
+                    source_db_path = os.path.join(self.source_dir, 'userData.db')
+                    if os.path.exists(source_db_path):
+                        try:
+                            conn = sqlite3.connect(source_db_path)
+                            conn.close()
+                        except:
+                            pass
                         
-                if os.path.exists(dest_db_path):
-                    try:
-                        conn = sqlite3.connect(dest_db_path)
-                        conn.close()
-                    except:
-                        pass
+                if self.dest_dir:
+                    dest_db_path = os.path.join(self.dest_dir, 'userData.db')
+                    if os.path.exists(dest_db_path):
+                        try:
+                            conn = sqlite3.connect(dest_db_path)
+                            conn.close()
+                        except:
+                            pass
                 
+                # Remove the temp directory
                 shutil.rmtree(self.temp_dir)
+                
+                # Log cleanup success with size info
+                size_mb = total_size / (1024 * 1024) if total_size > 0 else 0
+                self.logger.info(f"Cleaned up temp directory ({file_count} files, {size_mb:.1f} MB freed)")
+                
+                # Reset temp directory references
+                self.temp_dir = None
+                self.source_dir = None
+                self.dest_dir = None
+                
             except PermissionError:
                 self.logger.warning(f"Could not remove temporary directory {self.temp_dir}")
                 self.logger.warning("It may be in use. Please remove it manually.")
@@ -100,9 +162,16 @@ class JWLibrarySync:
                 self.logger.error(f"Error cleaning up temporary directory {self.temp_dir}")
                 self.logger.error(f"Error: {str(e)}")
                 self.logger.warning("You may need to remove it manually.")
+        else:
+            self.logger.debug("No temporary directory to clean up")
 
     def select_files(self):
         """Prompt user to select source and destination files"""
+        try:
+            from tkinter import Tk, filedialog
+        except ImportError:
+            raise JWLibrarySyncError("GUI functionality requires tkinter. Use web interface instead.")
+            
         root = Tk()
         root.withdraw()  # Hide the main window
 
@@ -314,6 +383,19 @@ class JWLibrarySync:
         """Merge all tables from source to destination"""
         source_db = None
         dest_db = None
+        
+        # Define merge steps with progress ranges
+        merge_steps = [
+            ('Location', 'LocationId', None, 35, 45, 'Merging locations...'),
+            ('UserMark', 'UserMarkId', {'LocationId': 'LocationId'}, 45, 55, 'Merging user marks...'),
+            ('BlockRange', 'BlockRangeId', {'UserMarkId': 'UserMarkId'}, 55, 60, 'Merging block ranges...'),
+            ('Note', 'NoteId', {'UserMarkId': 'UserMarkId', 'LocationId': 'LocationId'}, 60, 70, 'Merging notes...'),
+            ('PlaylistItem', 'PlaylistItemId', None, 70, 75, 'Merging playlist items...'),
+            ('Tag', 'TagId', None, 75, 78, 'Merging tags...'),
+            ('InputField', None, {'LocationId': 'LocationId'}, 78, 80, 'Merging input fields...'),
+            ('TagMap', 'TagMapId', {'PlaylistItemId': 'PlaylistItemId', 'LocationId': 'LocationId', 'NoteId': 'NoteId', 'TagId': 'TagId'}, 80, 85, 'Merging tag mappings...')
+        ]
+        
         try:
             source_db = sqlite3.connect(os.path.join(self.source_dir, 'userData.db'))
             dest_db = sqlite3.connect(os.path.join(self.dest_dir, 'userData.db'))
@@ -321,38 +403,21 @@ class JWLibrarySync:
             cursor_src = source_db.cursor()
             cursor_dest = dest_db.cursor()
 
-            # Merge Location table first (no dependencies)
-            self.merge_table(cursor_src, cursor_dest, 'Location', 'LocationId')
-
-            # Merge UserMark table (depends on Location)
-            self.merge_table(cursor_src, cursor_dest, 'UserMark', 'UserMarkId',
-                           {'LocationId': self.id_mappings['LocationId']})
-
-            # Merge BlockRange table (depends on UserMark)
-            self.merge_table(cursor_src, cursor_dest, 'BlockRange', 'BlockRangeId',
-                           {'UserMarkId': self.id_mappings['UserMarkId']})
-
-            # Merge Note table (depends on both UserMark and Location)
-            self.merge_table(cursor_src, cursor_dest, 'Note', 'NoteId',
-                           {'UserMarkId': self.id_mappings['UserMarkId'],
-                            'LocationId': self.id_mappings['LocationId']})
-
-            # Merge PlaylistItem table (no dependencies)
-            self.merge_table(cursor_src, cursor_dest, 'PlaylistItem', 'PlaylistItemId')
-
-            # Merge Tag table (no dependencies)
-            self.merge_table(cursor_src, cursor_dest, 'Tag', 'TagId')
-
-            # Merge InputField table (depends on Location)
-            self.merge_table(cursor_src, cursor_dest, 'InputField', None,
-                           {'LocationId': self.id_mappings['LocationId']})
-
-            # Merge TagMap table (depends on multiple tables)
-            self.merge_table(cursor_src, cursor_dest, 'TagMap', 'TagMapId',
-                           {'PlaylistItemId': self.id_mappings['PlaylistItemId'],
-                            'LocationId': self.id_mappings['LocationId'],
-                            'NoteId': self.id_mappings['NoteId'],
-                            'TagId': self.id_mappings['TagId']})
+            for i, (table_name, id_column, dependencies, start_progress, end_progress, message) in enumerate(merge_steps):
+                if self.progress_callback:
+                    self.progress_callback(progress=start_progress, message=message)
+                
+                # Resolve dependencies
+                resolved_dependencies = None
+                if dependencies:
+                    resolved_dependencies = {}
+                    for dep_col, mapping_key in dependencies.items():
+                        resolved_dependencies[dep_col] = self.id_mappings[mapping_key]
+                
+                self.merge_table(cursor_src, cursor_dest, table_name, id_column, resolved_dependencies)
+                
+                if self.progress_callback:
+                    self.progress_callback(progress=end_progress)
 
             dest_db.commit()
 

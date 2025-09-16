@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>JW Library Sync</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="UTF-8">
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --primary-hover: #1d4ed8;
+            --success-color: #059669;
+            --success-hover: #047857;
+            --error-color: #dc2626;
+            --error-bg: #fef2f2;
+            --error-border: #fecaca;
+            --text-primary: #1f2937;
+            --text-secondary: #6b7280;
+            --text-muted: #9ca3af;
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8fafc;
+            --bg-card: #ffffff;
+            --border-light: #e5e7eb;
+            --border-focus: #2563eb;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            --radius-sm: 6px;
+            --radius-md: 8px;
+            --radius-lg: 12px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--text-primary);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 1rem;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            background: var(--bg-card);
+            padding: 2rem;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            width: 100%;
+            max-width: 600px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        h1 {
+            color: var(--text-primary);
+            text-align: center;
+            font-size: 2rem;
+            font-weight: 700;
+            margin: 0 0 2rem 0;
+            background: linear-gradient(135deg, var(--primary-color), var(--success-color));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.025em;
+        }
+
+        input[type="file"] {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid var(--border-light);
+            border-radius: var(--radius-md);
+            background: var(--bg-secondary);
+            font-size: 0.875rem;
+            transition: all 0.2s ease-in-out;
+            cursor: pointer;
+        }
+
+        input[type="file"]:hover {
+            border-color: var(--border-focus);
+            background: var(--bg-primary);
+        }
+
+        input[type="file"]:focus {
+            outline: none;
+            border-color: var(--border-focus);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+            background: var(--bg-primary);
+        }
+
+        .submit-btn {
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
+            color: white;
+            padding: 0.875rem 2rem;
+            border: none;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            width: 100%;
+            transition: all 0.2s ease-in-out;
+            box-shadow: var(--shadow-md);
+            text-transform: uppercase;
+            letter-spacing: 0.025em;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+            background: linear-gradient(135deg, var(--primary-hover), #1e40af);
+        }
+
+        .submit-btn:active {
+            transform: translateY(0);
+        }
+
+        .submit-btn:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .submit-btn:disabled:hover {
+            transform: none;
+            box-shadow: var(--shadow-md);
+        }
+
+        .loading-text {
+            display: none;
+        }
+
+        .upload-progress {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: var(--bg-secondary);
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-light);
+        }
+
+        .upload-progress-bar {
+            width: 100%;
+            height: 0.5rem;
+            background: var(--border-light);
+            border-radius: var(--radius-sm);
+            overflow: hidden;
+            margin-bottom: 0.5rem;
+        }
+
+        .upload-progress-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--primary-color), var(--success-color));
+            border-radius: var(--radius-sm);
+            transition: width 0.3s ease-in-out;
+        }
+
+        .upload-progress-text {
+            text-align: center;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .alert {
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            border-radius: var(--radius-md);
+            border: 1px solid;
+            display: flex;
+            align-items: center;
+        }
+
+        .alert::before {
+            content: '⚠️';
+            margin-right: 0.5rem;
+            font-size: 1.25rem;
+        }
+
+        .alert-error {
+            background: var(--error-bg);
+            color: var(--error-color);
+            border-color: var(--error-border);
+        }
+
+        .info {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+            margin-top: 0.5rem;
+            display: flex;
+            align-items: center;
+        }
+
+        .info::before {
+            content: 'ℹ️';
+            margin-right: 0.5rem;
+        }
+
+        .instructions {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-md);
+            padding: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .instructions h3 {
+            margin: 0 0 1rem 0;
+            color: var(--text-primary);
+            font-size: 1.125rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+        }
+
+        .instructions h3::before {
+            content: '📋';
+            margin-right: 0.5rem;
+        }
+
+        .instructions ol {
+            margin: 0;
+            padding-left: 1.25rem;
+        }
+
+        .instructions li {
+            margin-bottom: 0.5rem;
+            color: var(--text-secondary);
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            cursor: pointer;
+        }
+
+        .file-input-wrapper::after {
+            content: '📁 Choose File';
+            position: absolute;
+            right: 0.75rem;
+            top: 50%;
+            transform: translateY(-50%);
+            background: var(--primary-color);
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: var(--radius-sm);
+            font-size: 0.75rem;
+            font-weight: 600;
+            pointer-events: none;
+            text-transform: uppercase;
+            letter-spacing: 0.025em;
+        }
+
+        /* Mobile responsiveness */
+        @media (max-width: 640px) {
+            body {
+                padding: 0.5rem;
+            }
+            
+            .container {
+                padding: 1.5rem;
+            }
+            
+            h1 {
+                font-size: 1.75rem;
+                margin-bottom: 1.5rem;
+            }
+            
+            .form-group {
+                margin-bottom: 1.25rem;
+            }
+        }
+
+        /* Dark mode support */
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --text-primary: #f9fafb;
+                --text-secondary: #d1d5db;
+                --text-muted: #9ca3af;
+                --bg-primary: #1f2937;
+                --bg-secondary: #374151;
+                --bg-card: #1f2937;
+                --border-light: #374151;
+                --error-bg: #431a20;
+                --error-border: #7f1d1d;
+            }
+            
+            body {
+                background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            }
+            
+            .container {
+                border-color: rgba(255, 255, 255, 0.1);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>JW Library Backup Merger</h1>
+        
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-error">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        <form id="upload-form" enctype="multipart/form-data">
+            <div class="form-group">
+                <label for="source_file">Source Backup (.jwlibrary):</label>
+                <div class="file-input-wrapper">
+                    <input type="file" id="source_file" name="source_file" accept=".jwlibrary" required>
+                </div>
+                <div class="info">Select the backup file you want to merge FROM</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="dest_file">Destination Backup (.jwlibrary):</label>
+                <div class="file-input-wrapper">
+                    <input type="file" id="dest_file" name="dest_file" accept=".jwlibrary" required>
+                </div>
+                <div class="info">Select the backup file you want to merge TO</div>
+            </div>
+            
+            <div class="form-group">
+                <button type="submit" class="submit-btn" id="submit-btn">
+                    <span class="button-text">✨ Merge Backups</span>
+                    <span class="loading-text" style="display: none;">🔄 Uploading...</span>
+                </button>
+            </div>
+            
+            <div class="upload-progress" id="upload-progress" style="display: none;">
+                <div class="upload-progress-bar">
+                    <div class="upload-progress-fill" id="upload-progress-fill"></div>
+                </div>
+                <div class="upload-progress-text" id="upload-progress-text">Preparing upload...</div>
+            </div>
+        </form>
+        
+        <div class="instructions">
+            <h3>Instructions</h3>
+            <ol>
+                <li>Select your source backup file (the one with data to copy)</li>
+                <li>Select your destination backup file (the one to merge into)</li>
+                <li>Click "Merge Backups" to process the files</li>
+                <li>Download the merged result when complete</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('upload-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const form = e.target;
+            const formData = new FormData(form);
+            const submitBtn = document.getElementById('submit-btn');
+            const buttonText = submitBtn.querySelector('.button-text');
+            const loadingText = submitBtn.querySelector('.loading-text');
+            const uploadProgress = document.getElementById('upload-progress');
+            const uploadProgressFill = document.getElementById('upload-progress-fill');
+            const uploadProgressText = document.getElementById('upload-progress-text');
+            
+            // Validate files are selected
+            const sourceFile = document.getElementById('source_file').files[0];
+            const destFile = document.getElementById('dest_file').files[0];
+            
+            if (!sourceFile || !destFile) {
+                alert('Please select both source and destination files');
+                return;
+            }
+            
+            if (!sourceFile.name.endsWith('.jwlibrary') || !destFile.name.endsWith('.jwlibrary')) {
+                alert('Please upload .jwlibrary files only');
+                return;
+            }
+            
+            // Disable form and show loading state
+            submitBtn.disabled = true;
+            buttonText.style.display = 'none';
+            loadingText.style.display = 'inline';
+            uploadProgress.style.display = 'block';
+            
+            // Create XMLHttpRequest for upload progress tracking
+            const xhr = new XMLHttpRequest();
+            
+            // Track upload progress
+            xhr.upload.addEventListener('progress', function(e) {
+                if (e.lengthComputable) {
+                    const percentComplete = (e.loaded / e.total) * 100;
+                    uploadProgressFill.style.width = percentComplete + '%';
+                    uploadProgressText.textContent = `Uploading files: ${Math.round(percentComplete)}%`;
+                }
+            });
+            
+            // Handle response
+            xhr.addEventListener('load', function() {
+                if (xhr.status === 202) {
+                    // Success - redirect to progress page
+                    const response = JSON.parse(xhr.responseText);
+                    window.location.href = `/progress/${response.job_id}`;
+                } else {
+                    // Error
+                    let errorMessage = 'Upload failed';
+                    try {
+                        const errorResponse = JSON.parse(xhr.responseText);
+                        errorMessage = errorResponse.error || errorMessage;
+                    } catch (e) {
+                        errorMessage = `HTTP ${xhr.status}: ${xhr.statusText}`;
+                    }
+                    
+                    alert(errorMessage);
+                    resetForm();
+                }
+            });
+            
+            // Handle network errors
+            xhr.addEventListener('error', function() {
+                alert('Network error occurred. Please check your connection and try again.');
+                resetForm();
+            });
+            
+            // Handle timeout
+            xhr.addEventListener('timeout', function() {
+                alert('Upload timeout. Please try again with a stable connection.');
+                resetForm();
+            });
+            
+            // Configure and send request
+            xhr.open('POST', '/api/upload', true);
+            xhr.timeout = 300000; // 5 minutes timeout
+            xhr.send(formData);
+            
+            function resetForm() {
+                submitBtn.disabled = false;
+                buttonText.style.display = 'inline';
+                loadingText.style.display = 'none';
+                uploadProgress.style.display = 'none';
+                uploadProgressFill.style.width = '0%';
+                uploadProgressText.textContent = 'Preparing upload...';
+            }
+        });
+        
+        // Add file validation on file selection
+        function validateFile(input, label) {
+            input.addEventListener('change', function() {
+                const file = this.files[0];
+                if (file && !file.name.endsWith('.jwlibrary')) {
+                    alert(`${label}: Please select a .jwlibrary file`);
+                    this.value = '';
+                }
+            });
+        }
+        
+        validateFile(document.getElementById('source_file'), 'Source file');
+        validateFile(document.getElementById('dest_file'), 'Destination file');
+    </script>
+</body>
+</html>
